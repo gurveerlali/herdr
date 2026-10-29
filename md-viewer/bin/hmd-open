@@ -14,6 +14,6 @@ for p in json.load(sys.stdin)["result"]["panes"]:
 cwd=$("$H" pane get "$pane" | python3 -c 'import sys,json;p=json.load(sys.stdin)["result"]["pane"];print(p.get("foreground_cwd") or p["cwd"])')
 p="${raw%%:[0-9]*}"; p="${p#file://}"
 case "$p" in "~"*) p="$HOME${p#\~}";; /*) ;; *) p="$cwd/$p";; esac
-if [ ! -f "$p" ]; then osascript -e "display notification \"not found: $p\" with title \"hmd\"" 2>/dev/null; exit 1; fi
+if [ ! -f "$p" ]; then echo "$(date +%T) not a file: $p (raw: $raw)" >> /tmp/hmd-open.log; osascript -e "display notification \"not found: $p\" with title \"hmd\"" 2>/dev/null; exit 1; fi
 case "$p" in *.md|*.markdown) ;; *) exec open "$p";; esac   # non-markdown: macOS default app
 HERDR_ENV=1 HERDR_PANE_ID="$pane" HERDR_WORKSPACE_ID="${pane%%:*}" exec "$HOME/.local/bin/hmd" "$p"
