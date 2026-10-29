@@ -47,3 +47,5 @@ Tested via `HMD_TARGET_PANE` override: absolute and relative (`README.md:3`) pat
 Cost of capture off: no herdr mouse UI (sidebar/tab clicks, drag-select, right-click menu).
 
 Applied: `[ui] mouse_capture = false` in config.toml (backup config.toml.bak-hmd2). Revert by deleting that line.
+
+hmd-open on a directory opens that directory's newest .md (non-recursive); notifies if none.
