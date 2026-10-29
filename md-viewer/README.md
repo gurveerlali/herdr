@@ -15,8 +15,11 @@
    (no rendering). `hmd-view` uses glow > mdcat > bat > cat, so it works today (unrendered) with nothing installed.
 2. **`hmd <file>`**: splits a pane to the right of the caller (`--down`, `--tab` also available), names it
    `md:<file>`, and runs `hmd-view`. Doesn't steal focus. Outside herdr it renders inline.
-3. **Live reload**: `hmd-view` polls mtime every 0.5s and re-renders (glow has no watch mode). Agents
-   rewriting a plan file show up within ~0.5s. Press `q` (or Ctrl-C) in the viewer to close it; the pane exits with it. (macOS bash 3.2: integer `read -t` only, so mtime is polled every ~1s.)
+3. **Viewer (`bin/hmd-view`, Python 3, stdlib only)**: renders with glow (`-s dark`, override with `HMD_STYLE`),
+   draws a header with a red **[x]** close button, and handles its own scrolling because it turns on mouse
+   reporting: wheel, j/k, arrows, space/b, PgUp/PgDn, g/G. `q`, Ctrl-C or clicking [x] closes the pane.
+   It re-renders on file change (0.4s poll) or resize and keeps the scroll position.
+   Trade-off: no drag-select inside the viewer while it owns the mouse.
 4. **Click a path**: herdr only routes Ctrl+click on *URLs*. `plugin/` (id `local.hmd`, linked with
    `herdr plugin link plugin`) registers a link handler for `^file://.*\.md$` -> `open.sh` -> `hmd`.
    It also has an `open-selection` action that reads a selected-text field from `HERDR_PLUGIN_CONTEXT_JSON`
@@ -50,3 +53,7 @@ REVERTED: `mouse_capture = false` killed all herdr mouse use, which is not accep
 Candidate: iTerm bypasses mouse reporting while Option is held, so Cmd+Option+click may reach Semantic History with capture on (untested).
 
 hmd-open on a directory opens that directory's newest .md (non-recursive); notifies if none.
+
+## Viewer tests (via `herdr pane send-text`)
+j x5 + SGR wheel-down scrolled 8 lines; appending to the file re-rendered in place; click on a body row
+did nothing; click on the [x] column in row 1 closed the pane; `q` closed a pane opened via the plugin path.

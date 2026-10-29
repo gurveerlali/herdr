@@ -1,24 +1,159 @@
-#!/usr/bin/env bash
-# hmd-view <file>: render markdown in this terminal, re-render whenever the file changes.
-# Runs inside the herdr pane created by `hmd`. Press q (or Ctrl-C) to close.
-f="${1:?usage: hmd-view <file.md>}"
-render() {
-  local w=${COLUMNS:-$(tput cols)}
-  if command -v glow >/dev/null;   then glow -s auto -w "$w" "$f"
-  elif command -v mdcat >/dev/null; then mdcat --columns "$w" "$f"
-  elif command -v bat >/dev/null;   then bat --style=plain --color=always -l md "$f"
-  else cat "$f"; fi
-}
-mt() { stat -f %m "$f" 2>/dev/null || stat -c %Y "$f"; }
-last=""
-trap 'printf "\033[?25h"; exit 0' INT TERM
-while :; do
-  cur=$(mt) || { sleep 1; continue; }
-  if [ "$cur" != "$last" ]; then
-    last=$cur
-    printf '\033[2J\033[3J\033[H'
-    printf '\033[2m%s  (live, %s, q to close)\033[0m\n\n' "$f" "$(date +%H:%M:%S)"
-    render
-  fi
-  if read -rsn1 -t 1 k; then case $k in q|Q) exit 0;; esac; fi
-done
+#!/usr/bin/env python3
+"""hmd-view <file.md>: live-reloading markdown viewer for a herdr pane.
+
+Header row has a clickable [x]. Scroll: wheel, j/k, arrows, space/b, PgUp/PgDn, g/G.
+q, Ctrl-C, or clicking [x] closes. Re-renders when the file changes or the pane resizes,
+keeping the scroll position. Rendering: glow > mdcat > bat > plain text.
+"""
+import os, re, select, shutil, signal, subprocess, sys, termios, time, tty
+
+STYLE = os.environ.get("HMD_STYLE", "dark")
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+MOUSE = re.compile(r"\x1b\[<(\d+);(\d+);(\d+)([Mm])")
+
+
+def render(path, width):
+    cmds = []
+    if shutil.which("glow"):
+        cmds.append(["glow", "-s", STYLE, "-w", str(width), path])
+    if shutil.which("mdcat"):
+        cmds.append(["mdcat", "--columns", str(width), path])
+    if shutil.which("bat"):
+        cmds.append(["bat", "--style=plain", "--color=always", "-l", "md", path])
+    for c in cmds:
+        try:
+            r = subprocess.run(c, capture_output=True, text=True, timeout=20)
+            if r.returncode == 0:
+                return r.stdout.splitlines()
+        except Exception:
+            pass
+    try:
+        with open(path, errors="replace") as fh:
+            return fh.read().splitlines()
+    except OSError as e:
+        return [f"cannot read {path}: {e}"]
+
+
+class Viewer:
+    def __init__(self, path):
+        self.path = os.path.abspath(path)
+        self.off = 0
+        self.lines = []
+        self.mtime = None
+        self.stamp = ""
+        self.resized = True
+
+    def size(self):
+        s = shutil.get_terminal_size((80, 24))
+        return s.columns, s.lines
+
+    def reload(self):
+        w, _ = self.size()
+        self.lines = render(self.path, max(20, w - 1))
+        self.stamp = time.strftime("%H:%M:%S")
+
+    def body_rows(self):
+        return max(1, self.size()[1] - 1)
+
+    def clamp(self):
+        self.off = max(0, min(self.off, max(0, len(self.lines) - self.body_rows())))
+
+    def xcol(self):
+        return self.size()[0] - 3  # [x] occupies the last 3 columns (1-based start)
+
+    def draw(self):
+        w, h = self.size()
+        self.clamp()
+        rows = self.body_rows()
+        total = len(self.lines)
+        pct = 100 if total <= rows else int(100 * (self.off + rows) / total)
+        name = os.path.basename(self.path)
+        left = f" {name}  live {self.stamp}  {pct}%  q/[x] close"
+        left = left[: max(0, w - 4)].ljust(max(0, w - 3))
+        out = ["\x1b[H", "\x1b[7m", left, "\x1b[0m\x1b[1;37;41m[x]\x1b[0m"]
+        for i in range(rows):
+            out.append(f"\x1b[{i + 2};1H\x1b[0m")
+            j = self.off + i
+            if j < total:
+                out.append(self.lines[j])
+            out.append("\x1b[0m\x1b[K")
+        sys.stdout.write("".join(out))
+        sys.stdout.flush()
+
+    def scroll(self, n):
+        self.off += n
+
+    def handle(self, data):
+        """Return False to quit."""
+        for m in MOUSE.finditer(data):
+            b, x, y, kind = int(m[1]), int(m[2]), int(m[3]), m[4]
+            if b == 64:
+                self.scroll(-3)
+            elif b == 65:
+                self.scroll(3)
+            elif b == 0 and kind == "M" and y == 1 and x >= self.xcol():
+                return False
+        data = MOUSE.sub("", data)
+        page = self.body_rows() - 1
+        keys = {
+            "\x1b[A": -1, "\x1b[B": 1, "\x1b[5~": -page, "\x1b[6~": page,
+            "\x1bOA": -1, "\x1bOB": 1,
+        }
+        for seq, n in keys.items():
+            while seq in data:
+                self.scroll(n)
+                data = data.replace(seq, "", 1)
+        data = ANSI.sub("", data)
+        for ch in data:
+            if ch in "qQ\x03":
+                return False
+            elif ch == "j":
+                self.scroll(1)
+            elif ch == "k":
+                self.scroll(-1)
+            elif ch in " f":
+                self.scroll(page)
+            elif ch == "b":
+                self.scroll(-page)
+            elif ch == "g":
+                self.off = 0
+            elif ch == "G":
+                self.off = len(self.lines)
+        return True
+
+    def run(self):
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        signal.signal(signal.SIGWINCH, lambda *_: setattr(self, "resized", True))
+        signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+        sys.stdout.write("\x1b[?1049h\x1b[?25l\x1b[?7l\x1b[?1000h\x1b[?1006h")
+        try:
+            tty.setraw(fd)
+            while True:
+                try:
+                    mt = os.stat(self.path).st_mtime_ns
+                except OSError:
+                    mt = None
+                if mt != self.mtime or self.resized:
+                    self.mtime, self.resized = mt, False
+                    self.reload()
+                    self.draw()
+                try:
+                    r, _, _ = select.select([fd], [], [], 0.4)
+                except InterruptedError:
+                    continue
+                if r:
+                    data = os.read(fd, 4096).decode("utf-8", "replace")
+                    if not self.handle(data):
+                        return
+                    self.draw()
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+            sys.stdout.write("\x1b[?1006l\x1b[?1000l\x1b[?7h\x1b[?25h\x1b[?1049l")
+            sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.exit("usage: hmd-view <file.md>")
+    Viewer(sys.argv[1]).run()
