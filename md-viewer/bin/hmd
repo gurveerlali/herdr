@@ -14,7 +14,7 @@ if [ $mode = tab ]; then
   out=$("$H" tab create --workspace "${HERDR_WORKSPACE_ID:?}" --cwd "$(dirname "$file")" --label "$(basename "$file")" --focus)
   pane=$(printf '%s' "$out" | python3 -c 'import sys,json;r=json.load(sys.stdin)["result"];print((r.get("root_pane") or r["pane"])["pane_id"])')
 else
-  out=$("$H" pane split --current --direction $dir --cwd "$(dirname "$file")" --no-focus)
+  out=$("$H" pane split "${HERDR_PANE_ID:---current}" --direction $dir --cwd "$(dirname "$file")" --no-focus)
   pane=$(printf '%s' "$out" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 fi
 "$H" pane rename "$pane" "md:$(basename "$file")" >/dev/null || true

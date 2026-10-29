@@ -17,16 +17,20 @@
    `md:<file>`, and runs `hmd-view`. Doesn't steal focus. Outside herdr it renders inline.
 3. **Live reload**: `hmd-view` polls mtime every 0.5s and re-renders (glow has no watch mode). Agents
    rewriting a plan file show up within ~0.5s. Ctrl-C closes the viewer; the pane exits with it.
-4. **Click a path in agent output**: herdr only routes clicks on *URLs*, and agents print bare paths.
-   Reasonable options: (a) if the agent/terminal emits `file:///...md` links, a plugin `link_handler`
-   with pattern `^file://.*\.md$` calling `hmd` would work (untested; needs the plugin, not yet built);
-   (b) otherwise a keybinding/plugin action that opens the selected text
-   (`HERDR_PLUGIN_CONTEXT_JSON` includes selected text) as a path. Both need a plugin; not built yet.
+4. **Click a path**: herdr only routes Ctrl+click on *URLs*. `plugin/` (id `local.hmd`, linked with
+   `herdr plugin link plugin`) registers a link handler for `^file://.*\.md$` -> `open.sh` -> `hmd`.
+   It also has an `open-selection` action that reads a selected-text field from `HERDR_PLUGIN_CONTEXT_JSON`
+   (key name not yet verified; no selection was available in testing, it fails cleanly). Binding it to a key
+   needs a `[[keys.command]]` with `type = "plugin_action"`, `command = "local.hmd.open-selection"` in config.toml (not done).
+   Agents must print `file:///...md` URLs for the click path to fire.
 
 ## Tested (this workspace, herdr 0.9.3)
 - `hmd <real plan .md>` split right: opens, content shown (with cat fallback, since glow is not installed).
 - Live reload: appended a line to a file, pane updated within 1.5s.
 - `hmd --tab`: new tab in the caller's workspace (after the `--workspace` fix). Test panes/tabs closed.
 
-## Install
-`bin/` onto PATH (symlink `bin/hmd` and `bin/hmd-view` into ~/.local/bin; `hmd` resolves symlinks) and `brew install glow`.
+- glow renders (installed via brew). Plugin linked; `open.sh` with a `file:///tmp/clicktest.md` URL opened a rendered pane.
+  A real Ctrl+click and the selection action were not exercised.
+
+## Install (done on this machine)
+`brew install glow`; symlink `bin/hmd`, `bin/hmd-view` into ~/.local/bin; `herdr plugin link plugin`.
