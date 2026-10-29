@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# hmd-view <file>: render markdown in this terminal, re-render whenever the file changes.
+# Runs inside the herdr pane created by `hmd`. Ctrl-C to quit.
+f="${1:?usage: hmd-view <file.md>}"
+render() {
+  local w=${COLUMNS:-$(tput cols)}
+  if command -v glow >/dev/null;   then glow -s auto -w "$w" "$f"
+  elif command -v mdcat >/dev/null; then mdcat --columns "$w" "$f"
+  elif command -v bat >/dev/null;   then bat --style=plain --color=always -l md "$f"
+  else cat "$f"; fi
+}
+mt() { stat -f %m "$f" 2>/dev/null || stat -c %Y "$f"; }
+last=""
+trap 'printf "\033[?25h"; exit 0' INT TERM
+while :; do
+  cur=$(mt) || { sleep 1; continue; }
+  if [ "$cur" != "$last" ]; then
+    last=$cur
+    printf '\033[2J\033[3J\033[H'
+    printf '\033[2m%s  (live, %s)\033[0m\n\n' "$f" "$(date +%H:%M:%S)"
+    render
+  fi
+  sleep 0.5
+done

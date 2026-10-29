@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# hmd [--tab] [--down] <file.md>: open a live-reloading rendered view in a new herdr pane
+# beside the caller (or a new tab). Falls back to rendering inline outside herdr.
+set -euo pipefail
+here="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")" && pwd)"
+mode=split dir=right
+while [ $# -gt 0 ]; do case $1 in --tab) mode=tab;; --down) dir=down;; *) break;; esac; shift; done
+[ $# -eq 1 ] || { echo "usage: hmd [--tab] [--down] <file.md>" >&2; exit 2; }
+file="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+[ -f "$file" ] || { echo "hmd: no such file: $1" >&2; exit 1; }
+[ "${HERDR_ENV:-}" = 1 ] || exec "$here/hmd-view" "$file"
+H="${HERDR_BIN_PATH:-herdr}"
+if [ $mode = tab ]; then
+  out=$("$H" tab create --workspace "${HERDR_WORKSPACE_ID:?}" --cwd "$(dirname "$file")" --label "$(basename "$file")" --focus)
+  pane=$(printf '%s' "$out" | python3 -c 'import sys,json;r=json.load(sys.stdin)["result"];print((r.get("root_pane") or r["pane"])["pane_id"])')
+else
+  out=$("$H" pane split --current --direction $dir --cwd "$(dirname "$file")" --no-focus)
+  pane=$(printf '%s' "$out" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
+fi
+"$H" pane rename "$pane" "md:$(basename "$file")" >/dev/null || true
+q=$(printf '%q' "$file")
+"$H" pane run "$pane" "$here/hmd-view $q; exit" >/dev/null
+echo "hmd: $file -> pane $pane"
