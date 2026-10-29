@@ -45,3 +45,5 @@ iTerm handles Cmd+click itself; its Semantic History runs `bin/hmd-open \(path) 
 the focused herdr pane, resolves relative paths against that pane's cwd, and calls `hmd`. Non-.md files go to `open`.
 Tested via `HMD_TARGET_PANE` override: absolute and relative (`README.md:3`) paths both opened. Real Cmd+click untested.
 Cost of capture off: no herdr mouse UI (sidebar/tab clicks, drag-select, right-click menu).
+
+Applied: `[ui] mouse_capture = false` in config.toml (backup config.toml.bak-hmd2). Revert by deleting that line.
