@@ -46,6 +46,7 @@ the focused herdr pane, resolves relative paths against that pane's cwd, and cal
 Tested via `HMD_TARGET_PANE` override: absolute and relative (`README.md:3`) paths both opened. Real Cmd+click confirmed working by Gurveer.
 Cost of capture off: no herdr mouse UI (sidebar/tab clicks, drag-select, right-click menu).
 
-Applied: `[ui] mouse_capture = false` in config.toml (backup config.toml.bak-hmd2). Revert by deleting that line.
+REVERTED: `mouse_capture = false` killed all herdr mouse use, which is not acceptable. Capture is back on (default).
+Candidate: iTerm bypasses mouse reporting while Option is held, so Cmd+Option+click may reach Semantic History with capture on (untested).
 
 hmd-open on a directory opens that directory's newest .md (non-recursive); notifies if none.
