@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # hmd-open <path> [ignored-cwd]: for iTerm Semantic History. Opens a .md path in a herdr pane
 # beside the focused pane. Relative paths resolve against the focused pane's cwd.
+echo "$(date +%T) args: $*" >> /tmp/hmd-open.log
 # HMD_TARGET_PANE overrides the target pane (for testing).
 set -uo pipefail
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
