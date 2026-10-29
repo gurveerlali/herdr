@@ -34,3 +34,7 @@
 
 ## Install (done on this machine)
 `brew install glow`; symlink `bin/hmd`, `bin/hmd-view` into ~/.local/bin; `herdr plugin link plugin`.
+
+## Keybinding (added)
+`prefix+m` -> `local.hmd.open-selection` appended to ~/.config/herdr/config.toml (backup: config.toml.bak-hmd).
+Select a .md path with the mouse, press prefix+m. Not yet verified with a real selection.
