@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# hmd-open <path> [ignored-cwd]: for iTerm Semantic History. Opens a .md path in a herdr pane
+# beside the focused pane. Relative paths resolve against the focused pane's cwd.
+# HMD_TARGET_PANE overrides the target pane (for testing).
+set -uo pipefail
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+raw="${1:-}"; [ -n "$raw" ] || exit 2
+H="${HERDR_BIN_PATH:-$(command -v herdr)}"
+pane="${HMD_TARGET_PANE:-$("$H" pane list | python3 -c 'import sys,json
+for p in json.load(sys.stdin)["result"]["panes"]:
+    if p.get("focused"): print(p["pane_id"]); break')}"
+[ -n "$pane" ] || { echo "hmd-open: no focused pane" >&2; exit 1; }
+cwd=$("$H" pane get "$pane" | python3 -c 'import sys,json;p=json.load(sys.stdin)["result"]["pane"];print(p.get("foreground_cwd") or p["cwd"])')
+p="${raw%%:[0-9]*}"; p="${p#file://}"
+case "$p" in "~"*) p="$HOME${p#\~}";; /*) ;; *) p="$cwd/$p";; esac
+if [ ! -f "$p" ]; then osascript -e "display notification \"not found: $p\" with title \"hmd\"" 2>/dev/null; exit 1; fi
+case "$p" in *.md|*.markdown) ;; *) exec open "$p";; esac   # non-markdown: macOS default app
+HERDR_ENV=1 HERDR_PANE_ID="$pane" HERDR_WORKSPACE_ID="${pane%%:*}" exec "$HOME/.local/bin/hmd" "$p"

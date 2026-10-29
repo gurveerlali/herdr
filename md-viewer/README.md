@@ -38,3 +38,10 @@
 ## Keybinding (added)
 `prefix+m` -> `local.hmd.open-selection` appended to ~/.config/herdr/config.toml (backup: config.toml.bak-hmd).
 Select a .md path with the mouse, press prefix+m. Not yet verified with a real selection.
+
+## Cmd+click (option A: iTerm Semantic History)
+herdr can't see Cmd+click (only Ctrl+click on URLs, and only with mouse_capture on). With `ui.mouse_capture = false`
+iTerm handles Cmd+click itself; its Semantic History runs `bin/hmd-open \(path) \(working directory)`, which finds
+the focused herdr pane, resolves relative paths against that pane's cwd, and calls `hmd`. Non-.md files go to `open`.
+Tested via `HMD_TARGET_PANE` override: absolute and relative (`README.md:3`) paths both opened. Real Cmd+click untested.
+Cost of capture off: no herdr mouse UI (sidebar/tab clicks, drag-select, right-click menu).
