@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # hmd-view <file>: render markdown in this terminal, re-render whenever the file changes.
-# Runs inside the herdr pane created by `hmd`. Ctrl-C to quit.
+# Runs inside the herdr pane created by `hmd`. Press q (or Ctrl-C) to close.
 f="${1:?usage: hmd-view <file.md>}"
 render() {
   local w=${COLUMNS:-$(tput cols)}
@@ -17,8 +17,8 @@ while :; do
   if [ "$cur" != "$last" ]; then
     last=$cur
     printf '\033[2J\033[3J\033[H'
-    printf '\033[2m%s  (live, %s)\033[0m\n\n' "$f" "$(date +%H:%M:%S)"
+    printf '\033[2m%s  (live, %s, q to close)\033[0m\n\n' "$f" "$(date +%H:%M:%S)"
     render
   fi
-  sleep 0.5
+  if read -rsn1 -t 1 k; then case $k in q|Q) exit 0;; esac; fi
 done

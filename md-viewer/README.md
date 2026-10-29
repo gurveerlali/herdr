@@ -16,7 +16,7 @@
 2. **`hmd <file>`**: splits a pane to the right of the caller (`--down`, `--tab` also available), names it
    `md:<file>`, and runs `hmd-view`. Doesn't steal focus. Outside herdr it renders inline.
 3. **Live reload**: `hmd-view` polls mtime every 0.5s and re-renders (glow has no watch mode). Agents
-   rewriting a plan file show up within ~0.5s. Ctrl-C closes the viewer; the pane exits with it.
+   rewriting a plan file show up within ~0.5s. Press `q` (or Ctrl-C) in the viewer to close it; the pane exits with it. (macOS bash 3.2: integer `read -t` only, so mtime is polled every ~1s.)
 4. **Click a path**: herdr only routes Ctrl+click on *URLs*. `plugin/` (id `local.hmd`, linked with
    `herdr plugin link plugin`) registers a link handler for `^file://.*\.md$` -> `open.sh` -> `hmd`.
    It also has an `open-selection` action that reads a selected-text field from `HERDR_PLUGIN_CONTEXT_JSON`
@@ -41,9 +41,9 @@ Select a .md path with the mouse, press prefix+m. Not yet verified with a real s
 
 ## Cmd+click (option A: iTerm Semantic History)
 herdr can't see Cmd+click (only Ctrl+click on URLs, and only with mouse_capture on). With `ui.mouse_capture = false`
-iTerm handles Cmd+click itself; its Semantic History runs `bin/hmd-open \(path) \(working directory)`, which finds
+iTerm handles Cmd+click itself; its Semantic History runs `/Users/gurveerlali/.local/bin/hmd-open \1 \2 \5` (iTerm placeholders: \1 file, \2 line, \5 cwd; `\(path)`/`\(matched)` do NOT work), which finds
 the focused herdr pane, resolves relative paths against that pane's cwd, and calls `hmd`. Non-.md files go to `open`.
-Tested via `HMD_TARGET_PANE` override: absolute and relative (`README.md:3`) paths both opened. Real Cmd+click untested.
+Tested via `HMD_TARGET_PANE` override: absolute and relative (`README.md:3`) paths both opened. Real Cmd+click confirmed working by Gurveer.
 Cost of capture off: no herdr mouse UI (sidebar/tab clicks, drag-select, right-click menu).
 
 Applied: `[ui] mouse_capture = false` in config.toml (backup config.toml.bak-hmd2). Revert by deleting that line.
