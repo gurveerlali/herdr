@@ -13,7 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "plugin"))
 
 import wtsearch  # noqa: E402
 from wtsearch import (  # noqa: E402
+    cache_is_stale,
     common_dir,
+    is_error_reply,
     dedupe_repos,
     list_all,
     read_cache,
@@ -53,7 +55,8 @@ class ScanTests(unittest.TestCase):
     def test_scan_finds_repos_and_prunes(self):
         with tempfile.TemporaryDirectory() as t:
             root = Path(t)
-            for d in ["a", "b/c", ".hidden/r", "Library/r", "node_modules/r", ".Trash/r", "d/e/f/g"]:
+            for d in ["a", "b/c", ".hidden/r", "Library/r", "node_modules/r", ".Trash/r", "d/e/f/g",
+                      "Pictures/r", "Music/r", "Movies/r", "Applications/r"]:
                 (root / d / ".git").mkdir(parents=True)
             # a nested repo inside a found repo must not be returned separately
             (root / "a" / "sub" / ".git").mkdir(parents=True)
@@ -133,7 +136,49 @@ class CacheTests(unittest.TestCase):
             self.assertEqual([f.name for f in p.parent.iterdir()], ["repos.json"])
 
 
+class ErrorReplyTests(unittest.TestCase):
+    def test_is_error_reply_top_level_only(self):
+        self.assertTrue(is_error_reply('{"error":{"code":"x","message":"m"},"id":"a"}'))
+        self.assertFalse(is_error_reply('{"result":{"pane":{"agent_status":"error","note":"error"}}}'))
+        self.assertTrue(is_error_reply("not json at all"))
+        self.assertFalse(is_error_reply(""))  # commands with no output are fine
+
+
+class StaleTests(unittest.TestCase):
+    def test_cache_is_stale(self):
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t) / "repos.json"
+            self.assertTrue(cache_is_stale(p))  # missing
+            write_cache(p, [])
+            self.assertFalse(cache_is_stale(p))
+            old = p.stat().st_mtime - 25 * 3600
+            os.utime(p, (old, old))
+            self.assertTrue(cache_is_stale(p))
+
+
 class MainTests(unittest.TestCase):
+    def test_list_merges_live_pane_repos(self):
+        with tempfile.TemporaryDirectory() as t:
+            cache = Path(t) / "repos.json"
+            write_cache(cache, [Path("/A")])
+            seen = []
+
+            def fake_herdr(args):
+                if args == ["pane", "list"]:
+                    return {"result": {"panes": [{"cwd": "/B/sub"}, {"cwd": "/A"}]}}
+                seen.append(args[-1])
+                return wt_result(Path(args[-1]).name, [wt(args[-1], "main")])
+
+            fake_common = {Path("/A"): Path("/A/.git"), Path("/B/sub"): Path("/B/.git")}.get
+            out = io.StringIO()
+            with mock.patch.object(wtsearch, "cache_path", return_value=cache), \
+                 mock.patch.object(wtsearch, "common_dir", side_effect=fake_common), \
+                 mock.patch.object(wtsearch, "discover", side_effect=AssertionError("no rescan")), \
+                 mock.patch.object(wtsearch, "herdr_json", side_effect=fake_herdr), \
+                 redirect_stdout(out):
+                wtsearch.main(["list"])
+            self.assertEqual(seen, ["/A", "/B/sub"])
+
     def test_list_discovers_when_no_cache(self):
         with tempfile.TemporaryDirectory() as t:
             cache = Path(t) / "repos.json"
@@ -144,12 +189,15 @@ class MainTests(unittest.TestCase):
                 write_cache(cache, [Path("/A")])
 
             def fake_herdr(args):
+                if args == ["pane", "list"]:
+                    return {"result": {"panes": []}}
                 self.assertEqual(args, ["worktree", "list", "--cwd", "/A"])
                 return wt_result("A", [wt("/A", "main")])
 
             out = io.StringIO()
             with mock.patch.object(wtsearch, "cache_path", return_value=cache), \
                  mock.patch.object(wtsearch, "discover", side_effect=fake_discover), \
+                 mock.patch.object(wtsearch, "common_dir", side_effect=lambda p: p / ".git"), \
                  mock.patch.object(wtsearch, "herdr_json", side_effect=fake_herdr), \
                  redirect_stdout(out):
                 rc = wtsearch.main(["list"])

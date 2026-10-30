@@ -3,6 +3,8 @@
 
 Usage:
   wtsearch.py discover   scan for repos and refresh the cache
+  wtsearch.py stale      exit 0 if the repo cache is missing or older than 24h
+  wtsearch.py is-error   exit 0 if stdin is a herdr error reply (or not JSON)
   wtsearch.py list       print one tab-separated line per worktree:
                          marker  repo  branch  path  open_workspace_id  repo_root
 """
@@ -13,10 +15,12 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-PRUNE = {"Library", "node_modules", ".Trash"}
+PRUNE = {"Library", "node_modules", ".Trash", "Pictures", "Music", "Movies", "Applications"}
+STALE_SECONDS = 24 * 3600
 OPEN_MARKER = "●"
 
 
@@ -69,8 +73,9 @@ def workspace_paths(herdr_json: dict) -> list[Path]:
 def dedupe_repos(paths: list[Path], common_dir_fn) -> list[Path]:
     seen: set[Path] = set()
     out: list[Path] = []
-    for p in paths:
-        cd = common_dir_fn(p)
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        dirs = list(ex.map(common_dir_fn, paths))
+    for p, cd in zip(paths, dirs):
         if cd is None or cd in seen:
             continue
         seen.add(cd)
@@ -133,6 +138,32 @@ def write_cache(path: Path, repos: list[Path]) -> None:
         raise
 
 
+def cache_is_stale(path: Path) -> bool:
+    try:
+        return time.time() - Path(path).stat().st_mtime > STALE_SECONDS
+    except OSError:
+        return True
+
+
+def is_error_reply(text: str) -> bool:
+    """True if herdr output is a top-level {"error": ...} reply or unparseable JSON."""
+    if not text.strip():
+        return False
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return True
+    return isinstance(data, dict) and "error" in data
+
+
+def live_pane_paths() -> list[Path]:
+    try:
+        return workspace_paths(herdr_json(["pane", "list"]))
+    except Exception as e:  # noqa: BLE001 - herdr unavailable: disk scan only
+        print(f"wtsearch: pane list failed: {e}", file=sys.stderr)
+        return []
+
+
 def herdr_json(args: list[str]) -> dict:
     proc = subprocess.run([herdr_bin(), *args], capture_output=True, text=True, timeout=30)
     try:
@@ -148,11 +179,7 @@ def herdr_json(args: list[str]) -> dict:
 
 
 def discover() -> None:
-    paths = scan_repos(Path.home())
-    try:
-        paths += workspace_paths(herdr_json(["pane", "list"]))
-    except Exception as e:  # noqa: BLE001 - herdr unavailable: disk scan only
-        print(f"wtsearch: pane list failed: {e}", file=sys.stderr)
+    paths = scan_repos(Path.home()) + live_pane_paths()
     write_cache(cache_path(), dedupe_repos(paths, common_dir))
 
 
@@ -161,11 +188,17 @@ def main(argv: list[str]) -> int:
     if cmd == "discover":
         discover()
         return 0
+    if cmd == "stale":
+        return 0 if cache_is_stale(cache_path()) else 1
+    if cmd == "is-error":
+        return 0 if is_error_reply(sys.stdin.read()) else 1
     if cmd == "list":
         repos = read_cache(cache_path())
         if repos is None:
             discover()
             repos = read_cache(cache_path()) or []
+        # repos behind live panes always show up, even before the next disk scan
+        repos = dedupe_repos(repos + live_pane_paths(), common_dir)
         for line in list_all(repos, lambda r: herdr_json(["worktree", "list", "--cwd", str(r)])):
             print(line)
         return 0

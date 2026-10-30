@@ -8,7 +8,7 @@
 ## How it finds repos
 - **Disk scan:** dirs up to 3 levels below `~` whose `.git` is a directory. Hidden dirs, `Library`, `node_modules` and `.Trash` are skipped.
 - **Open workspaces:** repos behind any open herdr pane, even outside `~`.
-- **Cache:** the repo list is stored in the plugin state dir. It's refreshed in the background every time the popup opens, so a new repo shows up on the next open, or immediately with Alt-R.
+- **Cache:** the disk-scan results are stored in the plugin state dir. The scan reruns on first use, when the cache is older than 24h, or on Alt-R (about 1–2s, with a "scanning repos…" message). Repos behind open herdr panes are merged in on every open, so they always appear.
 
 ## Install
 Requires `fzf` (`brew install fzf`) and `python3`.
