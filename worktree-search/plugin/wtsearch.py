@@ -4,7 +4,7 @@
 Usage:
   wtsearch.py discover   scan for repos and refresh the cache
   wtsearch.py list       print one tab-separated line per worktree:
-                         marker  repo  branch  path  open_workspace_id
+                         marker  repo  branch  path  open_workspace_id  repo_root
 """
 from __future__ import annotations
 
@@ -80,7 +80,9 @@ def dedupe_repos(paths: list[Path], common_dir_fn) -> list[Path]:
 
 def worktree_lines(result: dict) -> list[str]:
     res = result.get("result", {})
-    repo = res.get("source", {}).get("repo_name", "?")
+    src = res.get("source", {})
+    repo = src.get("repo_name", "?")
+    root = src.get("source_checkout_path") or src.get("repo_root") or ""
     lines = []
     for w in res.get("worktrees", []):
         if w.get("is_prunable"):
@@ -88,7 +90,7 @@ def worktree_lines(result: dict) -> list[str]:
         ws = w.get("open_workspace_id") or ""
         marker = OPEN_MARKER if ws else " "
         branch = "(detached)" if w.get("is_detached") or not w.get("branch") else w["branch"]
-        lines.append("\t".join([marker, repo, branch, w["path"], ws]))
+        lines.append("\t".join([marker, repo, branch, w["path"], ws, root]))
     return lines
 
 

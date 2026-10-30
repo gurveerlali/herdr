@@ -35,8 +35,9 @@ def make_repo(path: Path) -> Path:
     return path
 
 
-def wt_result(name, worktrees):
-    return {"result": {"source": {"repo_name": name}, "worktrees": worktrees}}
+def wt_result(name, worktrees, root=None):
+    src = {"repo_name": name, "source_checkout_path": root or f"/{name}"}
+    return {"result": {"source": src, "worktrees": worktrees}}
 
 
 def wt(path, branch=None, ws=None, detached=False, prunable=False):
@@ -84,14 +85,14 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(workspace_paths(j), [Path("/x"), Path("/y")])
 
     def test_worktree_lines(self):
-        r = wt_result("myapp", [
+        r = wt_result("myapp", root="/m", worktrees=[
             wt("/m", "main", ws="w21"),
             wt("/d", detached=True),
             wt("/p", "x", prunable=True),
         ])
         self.assertEqual(worktree_lines(r), [
-            "●\tmyapp\tmain\t/m\tw21",
-            " \tmyapp\t(detached)\t/d\t",
+            "●\tmyapp\tmain\t/m\tw21\t/m",
+            " \tmyapp\t(detached)\t/d\t\t/m",
         ])
 
     def test_line_path_with_space(self):
@@ -111,7 +112,7 @@ class ListAllTests(unittest.TestCase):
         err = io.StringIO()
         with redirect_stderr(err):
             lines = list_all([a, b, c], fetch)
-        self.assertEqual(lines, [" \tA\tmain\t/A\t", " \tC\tmain\t/C\t"])
+        self.assertEqual(lines, [" \tA\tmain\t/A\t\t/A", " \tC\tmain\t/C\t\t/C"])
         self.assertIn("wtsearch: skip /B: boom", err.getvalue())
 
 
@@ -154,7 +155,7 @@ class MainTests(unittest.TestCase):
                 rc = wtsearch.main(["list"])
             self.assertEqual(rc, 0)
             self.assertEqual(calls, [1])
-            self.assertEqual(out.getvalue(), " \tA\tmain\t/A\t\n")
+            self.assertEqual(out.getvalue(), " \tA\tmain\t/A\t\t/A\n")
 
 
 if __name__ == "__main__":
