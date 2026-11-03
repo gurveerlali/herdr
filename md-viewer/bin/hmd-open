@@ -2,18 +2,42 @@
 # hmd-open <path> [ignored-cwd]: for iTerm Semantic History. Opens a .md path in a herdr pane
 # beside the focused pane. Relative paths resolve against the focused pane's cwd.
 echo "$(date +%T) args: $*" >> /tmp/hmd-open.log
-# HMD_TARGET_PANE overrides the target pane (for testing).
+# The clicked pane is not necessarily focused (iTerm eats Cmd+click, herdr never sees it), so the
+# target is the pane in the focused pane's tab that shows the clicked text and where the path exists.
+# HMD_TARGET_PANE forces the target pane; HMD_FOCUSED_PANE fakes the focused pane (both for testing).
 set -uo pipefail
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 raw="${1:-}"; [ -n "$raw" ] || exit 2
 H="${HERDR_BIN_PATH:-$(command -v herdr)}"
-pane="${HMD_TARGET_PANE:-$("$H" pane list | python3 -c 'import sys,json
-for p in json.load(sys.stdin)["result"]["panes"]:
-    if p.get("focused"): print(p["pane_id"]); break')}"
-[ -n "$pane" ] || { echo "hmd-open: no focused pane" >&2; exit 1; }
-cwd=$("$H" pane get "$pane" | python3 -c 'import sys,json;p=json.load(sys.stdin)["result"]["pane"];print(p.get("foreground_cwd") or p["cwd"])')
-p="${raw%%:[0-9]*}"; p="${p#file://}"
-case "$p" in "~"*) p="$HOME${p#\~}";; /*) ;; *) p="$cwd/$p";; esac
+read -r pane p < <(HERDR="$H" python3 - "$raw" <<'EOF'
+import json, os, subprocess, sys
+raw = sys.argv[1]
+H = os.environ["HERDR"]
+def herdr(*a):
+    return subprocess.run([H, *a], capture_output=True, text=True).stdout
+rel = raw.split(":")[0] if not raw.startswith("file://") else raw[7:]
+rel = os.path.expanduser(rel)
+panes = json.loads(herdr("pane", "list"))["result"]["panes"]
+forced = os.environ.get("HMD_TARGET_PANE")
+focused = os.environ.get("HMD_FOCUSED_PANE") or next((p["pane_id"] for p in panes if p.get("focused")), None)
+if forced:
+    cands = [p for p in panes if p["pane_id"] == forced]
+else:
+    tab = next((p["tab_id"] for p in panes if p["pane_id"] == focused), None)
+    cands = sorted((p for p in panes if p["tab_id"] == tab), key=lambda p: p["pane_id"] != focused)
+def resolve(p):
+    return os.path.normpath(os.path.join(p.get("foreground_cwd") or p["cwd"], rel))
+def shows(p):
+    return raw in herdr("pane", "read", p["pane_id"], "--source", "visible")
+exists = [p for p in cands if os.path.exists(resolve(p))]
+pick = next((p for p in exists if shows(p)), None) or (exists[0] if exists else None) \
+    or next((p for p in cands if shows(p)), None) or (cands[0] if cands else None)
+if pick:
+    print(pick["pane_id"], resolve(pick))
+EOF
+)
+[ -n "${pane:-}" ] || { echo "$(date +%T) no target pane for $raw" >> /tmp/hmd-open.log; exit 1; }
+echo "$(date +%T) pane $pane -> $p" >> /tmp/hmd-open.log
 if [ -d "$p" ]; then   # directory: open its newest .md (README.md wins ties by recency only)
   newest=$(ls -t "$p"/*.md "$p"/*.markdown 2>/dev/null | head -1)
   echo "$(date +%T) dir $p -> ${newest:-none}" >> /tmp/hmd-open.log
