@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# hmd-default-open <file>...: what hmd.app (the macOS default .md app) runs for each opened file.
+# A herdr client attached to a terminal -> open in herdr via hmd-open and bring iTerm forward.
+# Otherwise, or if hmd-open fails -> the fallback editor (never plain `open`, which would loop back here).
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+FALLBACK="${HMD_FALLBACK_APP:-Visual Studio Code}"
+attached() { ps -axo tty=,comm= | awk '$1 != "??" && $2 ~ /(^|\/)herdr$/ {f=1} END {exit !f}'; }
+for f in "$@"; do
+  echo "$(date +%T) default-open: $f" >> /tmp/hmd-open.log
+  if attached && hmd-open "$f"; then
+    open -a iTerm
+  else
+    open -a "$FALLBACK" "$f"
+  fi
+done

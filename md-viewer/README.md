@@ -69,3 +69,14 @@ It waits for iTerm to quit before writing prefs (backup: ~/Library/Preferences/c
 the clicked pane is often not the focused one. Confirmed with a real Cmd+click.
 Still open: OSC 8 `file://` links (pi's read/write headers) open in the macOS default .md app (VS Code), and
 `prefix+m` gets no selected text.
+
+## Default .md app: hmd.app (2026-11-03)
+OSC 8 `file://` links (pi's read/write headers) and Finder double-clicks go to the macOS default .md app, not
+Semantic History. `bin/hmd-install-opener` builds `~/Applications/hmd.app` (AppleScript droplet, bundle id
+`local.hmd.opener`) and makes it the default for `net.daringfireball.markdown`. It runs `bin/hmd-default-open`:
+herdr client attached to a tty -> `hmd-open` + bring iTerm forward; otherwise, or on failure, VS Code
+(`HMD_FALLBACK_APP`). The previous default is saved in the plugin config dir; `--uninstall` restores it.
+Gotcha: `LSSetDefaultRoleHandlerForContentType` returns 0 but does nothing on current macOS; use
+`NSWorkspace.setDefaultApplication`. Switching back to VS Code returned userCanceledErr once (likely a
+confirmation dialog); if `--uninstall` fails, use Finder > Get Info > Open with > Change All.
+Tested: `open file.md` -> hmd.app -> viewer split beside the focused pane.

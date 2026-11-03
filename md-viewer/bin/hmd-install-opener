@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# hmd-install-opener [--uninstall]: build ~/Applications/hmd.app and make it the default app for .md,
+# so double-clicks and OSC 8 file:// links (pi's read/write headers) open in herdr via hmd-default-open.
+# --uninstall restores the previous default (saved on install) and leaves the app in place.
+set -euo pipefail
+APP="$HOME/Applications/hmd.app"
+ID=local.hmd.opener
+STATE="$HOME/.config/herdr/plugins/config/local.hmd/previous-md-handler"
+TYPES=(net.daringfireball.markdown)
+here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
+# NSWorkspace API: LSSetDefaultRoleHandlerForContentType returns 0 but is a silent no-op on current macOS.
+set_default() {  # bundle-id content-type...
+  swift - "$@" 2>/dev/null <<'EOF'
+import AppKit
+import UniformTypeIdentifiers
+let args = Array(CommandLine.arguments.dropFirst())
+guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: args[0]) else { print("no app for \(args[0])"); exit(1) }
+for t in args.dropFirst() {
+    let sem = DispatchSemaphore(value: 0)
+    NSWorkspace.shared.setDefaultApplication(at: app, toOpen: UTType(t)!) { err in
+        print("\(t) -> \(args[0]): \(err.map { "error \($0)" } ?? "ok")"); sem.signal()
+    }
+    while sem.wait(timeout: .now() + 0.1) == .timedOut { RunLoop.main.run(until: Date() + 0.1) }
+}
+EOF
+}
+current() {
+  swift - "$1" 2>/dev/null <<'EOF'
+import AppKit
+import UniformTypeIdentifiers
+let app = NSWorkspace.shared.urlForApplication(toOpen: UTType(CommandLine.arguments[1])!)
+print(app.flatMap { Bundle(url: $0)?.bundleIdentifier } ?? "")
+EOF
+}
+
+if [ "${1:-}" = "--uninstall" ]; then
+  prev=$(cat "$STATE" 2>/dev/null || echo com.microsoft.VSCode)
+  set_default "$prev" "${TYPES[@]}"
+  exit 0
+fi
+
+prev=$(current "${TYPES[0]}")
+if [ "$prev" != "$ID" ]; then mkdir -p "$(dirname "$STATE")"; echo "$prev" > "$STATE"; fi
+
+mkdir -p "$HOME/Applications"
+rm -rf "$APP"
+osacompile -o "$APP" -e "
+on open theFiles
+  repeat with f in theFiles
+    do shell script quoted form of \"$here/hmd-default-open\" & \" \" & quoted form of POSIX path of f & \" >/dev/null 2>&1 &\"
+  end repeat
+end open
+on run
+  display notification \"hmd opens .md files in herdr; open a file instead\" with title \"hmd\"
+end run"
+P="$APP/Contents/Info.plist"
+plutil -replace CFBundleIdentifier -string "$ID" "$P"
+plutil -replace CFBundleName -string hmd "$P"
+plutil -replace LSUIElement -bool true "$P"
+plutil -replace CFBundleDocumentTypes -json '[{"CFBundleTypeName":"Markdown","CFBundleTypeRole":"Viewer","LSHandlerRank":"Default","LSItemContentTypes":["net.daringfireball.markdown"]}]' "$P"
+codesign --force --deep -s - "$APP"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
+set_default "$ID" "${TYPES[@]}"
+echo "restore with --uninstall -> $(cat "$STATE")"
