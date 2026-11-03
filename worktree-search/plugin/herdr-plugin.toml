@@ -1,0 +1,19 @@
+id = "local.wtsearch"
+name = "worktree search"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Fuzzy-search every git worktree of every repo and jump to it"
+platforms = ["macos", "linux"]
+
+[[actions]]
+id = "open"
+title = "Search worktrees"
+command = ["bash", "open.sh"]
+
+[[panes]]
+id = "picker"
+title = "Worktree search"
+placement = "popup"
+width = "80%"
+height = "80%"
+command = ["bash", "picker.sh"]
