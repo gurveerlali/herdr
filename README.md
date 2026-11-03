@@ -31,3 +31,7 @@ herdr plugin link worktree-search/plugin
 The plugins are also installable straight from GitHub, e.g.
 `herdr plugin install gurveerlali/herdr/worktree-search/plugin`. The md-viewer plugin also needs the
 `bin/` scripts above.
+
+## License
+
+[MIT](LICENSE)
