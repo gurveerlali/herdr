@@ -12,7 +12,7 @@ defaults export "$DOMAIN" "$backup"
 tmp=$(mktemp -t hmd-iterm).plist
 cp "$backup" "$tmp"
 python3 - "$tmp" <<'EOF'
-import plistlib, sys
+import os, plistlib, sys
 path = sys.argv[1]
 p = plistlib.load(open(path, "rb"))
 defaults = plistlib.load(open("/Applications/iTerm.app/Contents/Resources/SmartSelectionRules.plist", "rb"))["Rules"]
@@ -21,7 +21,7 @@ rule = {
     "precision": "very_high",
     "regex": r"(?<![\w:/.~-])(?:~|\.{1,2})?/?(?:[\w.@+-]+/)*[\w.@+-]+\.(?:md|markdown)(?::\d+)?(?![\w/])",
     "actions": [{"title": "Open in hmd", "action": 2,  # kRunCommandContextMenuAction
-                 "parameter": "/Users/gurveerlali/.local/bin/hmd-open \\0"}],
+                 "parameter": os.path.expanduser("~/.local/bin/hmd-open") + " \\0"}],
 }
 guid = p.get("Default Bookmark Guid")
 for b in p["New Bookmarks"]:

@@ -44,7 +44,7 @@ Select a .md path with the mouse, press prefix+m. Not yet verified with a real s
 
 ## Cmd+click (option A: iTerm Semantic History)
 herdr can't see Cmd+click (only Ctrl+click on URLs, and only with mouse_capture on). With `ui.mouse_capture = false`
-iTerm handles Cmd+click itself; its Semantic History runs `/Users/gurveerlali/.local/bin/hmd-open \1 \2 \5` (iTerm placeholders: \1 file, \2 line, \5 cwd; `\(path)`/`\(matched)` do NOT work), which finds
+iTerm handles Cmd+click itself; its Semantic History runs `$HOME/.local/bin/hmd-open \1 \2 \5` (absolute path; iTerm does not expand ~) (iTerm placeholders: \1 file, \2 line, \5 cwd; `\(path)`/`\(matched)` do NOT work), which finds
 the focused herdr pane, resolves relative paths against that pane's cwd, and calls `hmd`. Non-.md files go to `open`.
 Tested via `HMD_TARGET_PANE` override: absolute and relative (`README.md:3`) paths both opened. Real Cmd+click confirmed working by Gurveer.
 Cost of capture off: no herdr mouse UI (sidebar/tab clicks, drag-select, right-click menu).

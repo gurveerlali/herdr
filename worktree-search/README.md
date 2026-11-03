@@ -14,7 +14,7 @@
 Requires `fzf` (`brew install fzf`) and `python3`.
 
 ```bash
-herdr plugin link ~/herdr-worktree-search/plugin
+herdr plugin link worktree-search/plugin   # from a clone of this repo
 cp ~/.config/herdr/config.toml ~/.config/herdr/config.toml.bak-wtsearch
 cat >> ~/.config/herdr/config.toml <<'EOF'
 

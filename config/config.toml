@@ -1,0 +1,27 @@
+onboarding = false
+
+[ui.sound]
+enabled = true
+
+[[keys.command]]
+key = "prefix+m"
+type = "plugin_action"
+command = "local.hmd.open-selection"
+description = "open selected .md"
+
+[[keys.command]]
+key = "ctrl+alt+f"
+type = "plugin_action"
+command = "local.wtsearch.open"
+description = "search worktrees"
+
+[ui.sidebar.spaces]
+rows = [
+  ["state_icon", { token = "$kind", bold = true, rules = [
+    { equals = "PR", fg = "#98c379" },
+    { equals = "ENG", fg = "#e5c07b" },
+    { equals = "REV", fg = "#61afef" },
+    { equals = "TSK", fg = "#c678dd" },
+  ] }, "workspace"],
+  ["branch", "git_status"],
+]
