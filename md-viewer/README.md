@@ -57,3 +57,15 @@ hmd-open on a directory opens that directory's newest .md (non-recursive); notif
 ## Viewer tests (via `herdr pane send-text`)
 j x5 + SGR wheel-down scrolled 8 lines; appending to the file re-rendered in place; click on a body row
 did nothing; click on the [x] column in row 1 closed the pane; `q` closed a pane opened via the plugin path.
+
+## Cmd+click on relative .md paths (fixed 2026-11-03)
+Symptom: Cmd+click on `docs/plan.md` opened Chrome. iTerm Semantic History only runs its command if the path
+exists relative to iTerm's cwd (the herdr client's, usually ~). Repo-relative paths fail that check, so iTerm
+treats them as URLs (`.md` is a TLD) and opens the browser. Absolute paths worked.
+Fix: `bin/hmd-iterm-rule` adds a Smart Selection rule (precision very_high, action Run Command
+`hmd-open \0`) to the Default profile; Cmd+click runs a matching rule's first action with no existence check.
+It waits for iTerm to quit before writing prefs (backup: ~/Library/Preferences/com.googlecode.iterm2.plist.bak-hmd-*).
+`hmd-open` then picks the pane in the focused tab that shows the clicked text and where the path exists, since
+the clicked pane is often not the focused one. Confirmed with a real Cmd+click.
+Still open: OSC 8 `file://` links (pi's read/write headers) open in the macOS default .md app (VS Code), and
+`prefix+m` gets no selected text.
