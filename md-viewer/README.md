@@ -22,9 +22,6 @@
    Trade-off: no drag-select inside the viewer while it owns the mouse.
 4. **Click a path**: herdr only routes Ctrl+click on *URLs*. `plugin/` (id `local.hmd`, linked with
    `herdr plugin link plugin`) registers a link handler for `^file://.*\.md$` -> `open.sh` -> `hmd`.
-   It also has an `open-selection` action that reads a selected-text field from `HERDR_PLUGIN_CONTEXT_JSON`
-   (key name not yet verified; no selection was available in testing, it fails cleanly). Binding it to a key
-   needs a `[[keys.command]]` with `type = "plugin_action"`, `command = "local.hmd.open-selection"` in config.toml (not done).
    Agents must print `file:///...md` URLs for the click path to fire.
 
 ## Tested (this workspace, herdr 0.9.3)
@@ -38,9 +35,10 @@
 ## Install (done on this machine)
 `brew install glow`; symlink `bin/hmd`, `bin/hmd-view` into ~/.local/bin; `herdr plugin link plugin`.
 
-## Keybinding (added)
-`prefix+m` -> `local.hmd.open-selection` appended to ~/.config/herdr/config.toml (backup: config.toml.bak-hmd).
-Select a .md path with the mouse, press prefix+m. Not yet verified with a real selection.
+## Keybinding (removed 2026-11-03)
+`prefix+m` -> an `open-selection` action that read the selected text from `HERDR_PLUGIN_CONTEXT_JSON`.
+It never worked: every invocation got an empty selection. Removed along with the action, since Cmd+click
+and hmd.app cover opening paths.
 
 ## Cmd+click (option A: iTerm Semantic History)
 herdr can't see Cmd+click (only Ctrl+click on URLs, and only with mouse_capture on). With `ui.mouse_capture = false`

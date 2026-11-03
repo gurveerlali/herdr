@@ -4,12 +4,6 @@ onboarding = false
 enabled = true
 
 [[keys.command]]
-key = "prefix+m"
-type = "plugin_action"
-command = "local.hmd.open-selection"
-description = "open selected .md"
-
-[[keys.command]]
 key = "ctrl+alt+f"
 type = "plugin_action"
 command = "local.wtsearch.open"

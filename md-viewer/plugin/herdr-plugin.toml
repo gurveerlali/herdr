@@ -2,17 +2,12 @@ id = "local.hmd"
 name = "hmd markdown viewer"
 version = "0.1.0"
 min_herdr_version = "0.7.0"
-description = "Open clicked file:// .md links, or selected .md paths, in a live rendered pane"
+description = "Open clicked file:// .md links in a live rendered pane"
 platforms = ["macos", "linux"]
 
 [[actions]]
 id = "open-link"
 title = "Open markdown link"
-command = ["bash", "open.sh"]
-
-[[actions]]
-id = "open-selection"
-title = "Open selected markdown path"
 command = ["bash", "open.sh"]
 
 [[link_handlers]]
