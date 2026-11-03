@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# hmd-iterm-rule: add an iTerm2 Smart Selection rule so Cmd+click on a .md path runs hmd-open.
+# Why: Semantic History only fires if the path exists relative to iTerm's cwd (the herdr client's,
+# usually ~), so repo-relative paths fall through to URL handling (.md is a TLD) and open in Chrome.
+# A Smart Selection rule with an action runs on Cmd+click without that existence check.
+# iTerm overwrites prefs from memory, so this waits until iTerm is not running. Idempotent.
+set -euo pipefail
+DOMAIN=com.googlecode.iterm2
+while pgrep -xq iTerm2; do sleep 1; done
+backup="$HOME/Library/Preferences/$DOMAIN.plist.bak-hmd-$(date +%Y%m%d%H%M%S)"
+defaults export "$DOMAIN" "$backup"
+tmp=$(mktemp -t hmd-iterm).plist
+cp "$backup" "$tmp"
+python3 - "$tmp" <<'EOF'
+import plistlib, sys
+path = sys.argv[1]
+p = plistlib.load(open(path, "rb"))
+defaults = plistlib.load(open("/Applications/iTerm.app/Contents/Resources/SmartSelectionRules.plist", "rb"))["Rules"]
+rule = {
+    "notes": "hmd: open .md paths in herdr",
+    "precision": "very_high",
+    "regex": r"(?<![\w:/.~-])(?:~|\.{1,2})?/?(?:[\w.@+-]+/)*[\w.@+-]+\.(?:md|markdown)(?::\d+)?(?![\w/])",
+    "actions": [{"title": "Open in hmd", "action": 2,  # kRunCommandContextMenuAction
+                 "parameter": "/Users/gurveerlali/.local/bin/hmd-open \\0"}],
+}
+guid = p.get("Default Bookmark Guid")
+for b in p["New Bookmarks"]:
+    if b["Guid"] != guid:
+        continue
+    rules = [r for r in b.get("Smart Selection Rules", defaults) if not r.get("notes", "").startswith("hmd:")]
+    b["Smart Selection Rules"] = [rule] + rules
+    print(f"profile {b['Name']}: {len(b['Smart Selection Rules'])} rules")
+plistlib.dump(p, open(path, "wb"))
+EOF
+defaults import "$DOMAIN" "$tmp"
+echo "installed; backup at $backup"
